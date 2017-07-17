@@ -1,6 +1,7 @@
 import json
 import cProfile
-from logging import basicConfig, getLogger, WARN
+import time
+from logging import basicConfig, getLogger, WARN as LEVEL
 
 from json_schema_validator.ref_resolver	import RefResolverFileUTF8
 from json_schema_validator.schema		import Schema
@@ -25,7 +26,7 @@ sys.stderr = Unbuffered(a)
 
 
 logger = getLogger('json_schema_validator')
-logger.setLevel(WARN)
+logger.setLevel(LEVEL)
 basicConfig(format='["%(asctime)-15s", "%(levelname)s", [%(message)s]]')
 
 
@@ -99,15 +100,17 @@ def main():
 
 	test_pair(
 		TOP2 + r'response_schema.json',
-		r'D:\files\code\python\json_schema_validator\schemas\schema.json'
+		r'D:\files\code\python\json_schema_validator\json_schema_validator\schemas\schema.json'
 	)
 		
 		
 if __name__ == "__main__":	
-	if 0:
-		cProfile.run("main()")
-	else:
+	if 1:
+		start = time.time()
 		main()
+		print  "time taken", time.time() - start
+	else:	
+		cProfile.run("main()")
 
 	
 

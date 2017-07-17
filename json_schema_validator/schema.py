@@ -16,42 +16,49 @@ debug, info, warning, error = logger.debug, logger.info, logger.warning, logger.
 
 class Schema(object):
 	@staticmethod
-	def ref_resolver_provider(ref_resolver = None):
-		if ref_resolver is None:
-			ref_resolver = RefResolverFileUTF8
-		elif not issubclass(ref_resolver, RefResolverBase):
-			raise SchemaException("Provided ref resolver: {} is not an instance of RefResolverBase".format(type(ref_resolver).__name__))
-		return ref_resolver
+	def ref_resolver_provider(ref_resolver_class = None):
+		if ref_resolver_class is None:
+			ref_resolver_class = RefResolverFileUTF8
+		elif isinstance(ref_resolver_class, RefResolverBase):	
+			return ref_resolver_class
+		elif not issubclass(ref_resolver_class, RefResolverBase):
+			raise SchemaException("Provided ref resolver: {} is not an instance of RefResolverBase".format(type(ref_resolver_class).__name__))
+		return ref_resolver_class
 
 	@staticmethod
-	def from_file(filename, ref_resolver = None):
-		ref_resolver = Schema.ref_resolver_provider(ref_resolver)
-		return Schema.from_json(ref_resolver(filename).schema, ref_resolver)
+	def from_file(filename, ref_resolver_class = None):
+		ref_resolver_class	= Schema.ref_resolver_provider(ref_resolver_class)
+		ref_resolver		= ref_resolver_class(filename)
+		return Schema(ref_resolver.schema, ref_resolver)
 
 	@staticmethod
-	def from_str(val, ref_resolver = None):
-		ref_resolver = Schema.ref_resolver_provider(ref_resolver)
+	def from_str(val, ref_resolver_class = None):
+		ref_resolver_class = Schema.ref_resolver_provider(ref_resolver_class)
 
 		try:
 			schema	= loads(val)
 		except Exception,e :
 			raise SchemaException("JSON serialisation error: {}".format(e), e)
 
-		return Schema(ref_resolver(schema).schema, ref_resolver)
+		ref_resolver		= ref_resolver_class(schema)	
+		return Schema(ref_resolver.schema, ref_resolver)
 
 	@staticmethod
-	def from_json(schema, ref_resolver = None):
-		ref_resolver = Schema.ref_resolver_provider(ref_resolver)
-		return Schema(ref_resolver(schema).schema, ref_resolver)
+	def from_json(schema, ref_resolver_class = None):
+		ref_resolver_class	= Schema.ref_resolver_provider(ref_resolver_class)
+		ref_resolver		= ref_resolver_class(schema)
+		return Schema(ref_resolver.schema, ref_resolver)
+	
 
-
-	def __init__(self, schema, ref_resolver = None):
+	def __init__(self, schema, ref_resolver):
 		self.schema			= schema
 		self.ref_resolver	= ref_resolver
+		
+		self.ref_resolver.absolute_ids_to_cache(self.schema)		
 
 	def validate(self, data, raise_if_fail = True):
 		try:
-			context_root	= Context(None, (None, None, self.schema, data))
+			context_root	= Context(None, (None, None, self.schema, data), frame = self.schema)
 			stack			= [(self.schema, data, context_root)]
 
 			while stack:
@@ -61,28 +68,33 @@ class Schema(object):
 				if type_data is None:
 					raise ValueError("Invalid type of instance data: {}, {}".format(type(inst_value), inst_value))
 
-				validators = VALIDATORS.get(type_data, []) + VALIDATORS.get(None, [])
+				validators = VALIDATORS.get(None, []) + VALIDATORS.get(type_data, [])
 				if not(validators):
 					warning('{"message": "No validators", "type": %s, "value":%s,"context":%s}', type_data, str(inst_value), context)
-
 
 				next_items	= []
 				for validator in validators:
 					if validator.name in schema_parent:
 						schema_value	= schema_parent[validator.name] if isinstance(schema_parent, dict) else validator.name == schema_parent
-						cont			= validator(self, schema_value, schema_parent, inst_value, context)
 
 						if logger.isEnabledFor(DEBUG):
 							debug(
-								'{{ "type": %s, "validator":%s, "value":%s, "schema":%s, "schema_parent":%s, "context":%s }}',
+								'{{ "type": %s, "validator": %s, "value": %s, "schema": %s, "schema_parent": %s, "context": %s}}',
 								str(Types.TYPES_STR_MAP[type_data]),
 								validator.name,
 								repr(inst_value),
 								repr(schema_value),
 								repr(schema_parent),
-								context.fmt(True)
+								context.fmt(True),
 							)
+
+
+						cont			= validator(self, schema_value, schema_parent, inst_value, context)
 						next_items.extend(cont)
+
+						#if there are any other tests in the object they get nuked by the $ref
+						if validator.name == "$ref":
+							break
 
 
 				if not context.failed:

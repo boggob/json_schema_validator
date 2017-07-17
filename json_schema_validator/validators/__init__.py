@@ -7,12 +7,15 @@ def _validators():
 	
 	return {
 
-				t :	[
+				t :	sorted(
+						(
 									_o
 									for _n in dir(m) 
 									for _o in [getattr(m, _n)]
 									if hasattr(_o, "name")
-								]
+						), 
+						key = lambda o: (getattr(o, "sortorder", 0), o.name)
+					)
 
 				for m in mods
 				for t in m.TYPES

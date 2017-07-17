@@ -8,8 +8,8 @@ debug, info, warning, error = logger.debug, logger.info, logger.warning, logger.
 
 
 class Context(object):
-	def __init__(self, parent, checker = (None, None, None, None)):
-		type_, validation, schema_value, inst_value = checker
+	def __init__(self, parent, checker = (None, None, None, None), frame = None):
+		type_, validation, schema_value, inst_value	= checker
 
 		self.parent			= parent
 		self.children		= []
@@ -17,6 +17,8 @@ class Context(object):
 		self.validation		= validation	#if validation	is None else getattr(parent, "validation", None)
 		self.schema_value	= schema_value	if schema_value	is not None else getattr(parent, "schema_value", None)
 		self.inst_value		= inst_value	if inst_value	is not None else getattr(parent, "inst_value", None)
+		self.id				= parent.id		if parent		else ""
+		self.frame			= frame or (parent.frame if parent		else "")
 
 		self.failed			= 0
 		self.issues			= []
@@ -29,7 +31,15 @@ class Context(object):
 			parent.leaves_	= None
 			parent.children.append(self)
 
-
+	
+	def set_id(self, id_):
+		self.id = id_
+		stack = list(self.children)
+		while stack:
+			c = stack.pop()
+			stack.extend(c.children)
+			c.id = id_
+			
 	@property
 	def children_failed(self):
 		return [c for c in self.children if c.failed]
@@ -166,7 +176,8 @@ class Context(object):
 	def serialise(self, children, parents):
 		return dict(
 			[
-				["id",				id(self)],
+				["p_id",			id(self)],
+				["id",				self.id],
 				["depth",			self.depth],
 				["type",			self.type],
 				["complete",		self.complete],
@@ -175,6 +186,7 @@ class Context(object):
 				["failed",			self.failed],
 				["issues",			[i.serialise() for i in self.issues]],
 				["schema_value",	self.schema_value],
+				["schema_frame",	self.frame],
 				["inst_value",		self.inst_value],
 			]
 			+

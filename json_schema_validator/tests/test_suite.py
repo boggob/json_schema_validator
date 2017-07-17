@@ -5,6 +5,7 @@ import os.path
 import traceback
 import codecs
 import cProfile
+import time
 from logging import basicConfig, getLogger, DEBUG as LEVEL
 
 from json_schema_validator.ref_resolver	import RefResolverFileUTF8, RefResolverURL
@@ -67,7 +68,7 @@ def test_(path):
 				#ref = RefResolverFunny(r'D:\files\code\json\geojson\geojson.json')
 				print "\n" * 4
 				print "*" * 120
-				print "@@!", file_1, test
+				print "@@!", file_1, test['description'], test
 
 				try:
 					schema = Schema.from_json(test["schema"], RefResolverFunny)
@@ -78,7 +79,7 @@ def test_(path):
 						print "*" * 120
 						print file_1, t,
 
-						print "test failed", file_1, t, e, traceback.format_exc()
+						print ["test failed", file_1, t, e, traceback.format_exc()]
 
 
 				if schema is not None:
@@ -90,16 +91,21 @@ def test_(path):
 						try:
 							ret =  schema.validate(t["data"], raise_if_fail = False)
 							if t["valid"] and ret or not t["valid"] and not ret:
-								print "test failed", file_1, t, ret
+								print ["test failed", file_1, test['description'], t, ret]
 							else:
-								print "test passed", file_1, t, "\n", ret
+								print ["test passed", file_1, test['description'], t, "\n", ret]
 
 						except Exception, e:
-							print "test failed", file_1, t, e, traceback.format_exc()
+							print ["test failed", file_1, test['description'], t, e, traceback.format_exc()]
 
 
 if __name__ == "__main__":
 	PATH = r'D:\files\code\json\JSON-Schema-Test-Suite-master\tests\draft4'
-
-	cProfile.run("test_(PATH)")
+	
+	if 1:
+		start = time.time()
+		test_(PATH)
+		print  "time taken", time.time() - start
+	else:	
+		cProfile.run("test_(PATH)")
 	
